@@ -41,20 +41,27 @@ class RangeBarCalendarBuilders<T> {
 
   /// Header title (e.g. "2025年11月"). Receives the focused day and the
   /// current format.
-  final Widget Function(BuildContext context, DateTime focusedDay, RangeBarCalendarFormat format)?
+  final Widget Function(
+    BuildContext context,
+    DateTime focusedDay,
+    RangeBarCalendarFormat format,
+  )?
   headerTitleBuilder;
 
   /// Day-of-week label in the DOW row.
   final Widget Function(BuildContext context, int weekday)? dowBuilder;
 
   /// Day number label inside a cell.
-  final Widget Function(BuildContext context, RangeBarDayContext day)? dayNumberBuilder;
+  final Widget Function(BuildContext context, RangeBarDayContext day)?
+  dayNumberBuilder;
 
   /// Background of a single day cell (selection / today highlights, etc.).
-  final Widget Function(BuildContext context, RangeBarDayContext day)? cellBackgroundBuilder;
+  final Widget Function(BuildContext context, RangeBarDayContext day)?
+  cellBackgroundBuilder;
 
   /// Renders a single range bar segment.
-  final Widget Function(BuildContext context, RangeBarSegment<T> segment)? rangeBarBuilder;
+  final Widget Function(BuildContext context, RangeBarSegment<T> segment)?
+  rangeBarBuilder;
 
   /// Renders a single-day event using a Google Calendar-style inline row
   /// (e.g. "● HH:mm Title") instead of a colored bar.
@@ -68,7 +75,8 @@ class RangeBarCalendarBuilders<T> {
   /// (height = [RangeBarStyle.height]), and lane assignment / `+N`
   /// overflow handling are unchanged. Multi-day bars and tentative
   /// (month-precision) bars continue to use the regular bar rendering.
-  final Widget Function(BuildContext context, RangeBarSegment<T> segment)? singleDayEventBuilder;
+  final Widget Function(BuildContext context, RangeBarSegment<T> segment)?
+  singleDayEventBuilder;
 
   /// Renders the `+N more` indicator on a day.
   final Widget Function(

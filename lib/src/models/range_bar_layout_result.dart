@@ -8,6 +8,7 @@ import 'range_calendar_event.dart';
 class RangeBarLayoutResult<T> {
   const RangeBarLayoutResult({
     required this.segments,
+    required this.segmentsByWeek,
     required this.weekLaneCounts,
     required this.hiddenCounts,
     required this.hiddenEventsByDay,
@@ -15,6 +16,13 @@ class RangeBarLayoutResult<T> {
 
   /// All segments to draw.
   final List<RangeBarSegment<T>> segments;
+
+  /// Pre-bucketed view of [segments] indexed by `weekIndex`.
+  ///
+  /// `segmentsByWeek[w]` is the list of segments belonging to week `w` in
+  /// the visible page. Renderers can iterate this directly instead of
+  /// filtering [segments] with `where(weekIndex == w)` for each row.
+  final List<List<RangeBarSegment<T>>> segmentsByWeek;
 
   /// For each week index, the number of lanes actually used (used for
   /// computing row height).

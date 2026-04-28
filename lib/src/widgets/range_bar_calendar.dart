@@ -95,7 +95,8 @@ class RangeBarCalendar<T> extends StatefulWidget {
   /// こちらがタップ処理で優先される（[onEventLongPress] は影響しない）。
   /// 複数日にまたがるバーで「タップした日を選択してfocus月は動かさず
   /// その日の予定一覧を見せる」というユースケースをサポートする。
-  final void Function(RangeCalendarEvent<T> event, DateTime day)? onEventTapAtDay;
+  final void Function(RangeCalendarEvent<T> event, DateTime day)?
+  onEventTapAtDay;
 
   /// Invoked when [eventTapBehavior] is [RangeBarEventTapBehavior.openDetails]
   /// or callers want to open details from outside the bar tap (e.g. a
@@ -111,7 +112,11 @@ class RangeBarCalendar<T> extends StatefulWidget {
     '(explicit open) instead. Single tap should not navigate by default.',
   )
   final ValueChanged<RangeCalendarEvent<T>>? onEventTap;
-  final void Function(DateTime day, int hiddenCount, List<RangeCalendarEvent<T>> hiddenEvents)?
+  final void Function(
+    DateTime day,
+    int hiddenCount,
+    List<RangeCalendarEvent<T>> hiddenEvents,
+  )?
   onMoreTap;
 
   /// ヘッダー右側に挿入される任意ウィジェット（例: 「今日」ボタン）。
@@ -125,9 +130,11 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
   late PageController _pageController;
   late int _currentPage;
 
-  List<RangeCalendarEvent<T>> get _events => widget.events ?? <RangeCalendarEvent<T>>[];
+  List<RangeCalendarEvent<T>> get _events =>
+      widget.events ?? <RangeCalendarEvent<T>>[];
 
-  RangeBarCalendarBuilders<T> get _builders => widget.builders ?? RangeBarCalendarBuilders<T>();
+  RangeBarCalendarBuilders<T> get _builders =>
+      widget.builders ?? RangeBarCalendarBuilders<T>();
 
   @override
   void initState() {
@@ -139,8 +146,12 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
   @override
   void didUpdateWidget(covariant RangeBarCalendar<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final bool formatChanged = oldWidget.calendarFormat != widget.calendarFormat;
-    final int desiredPage = _pageIndexOf(widget.focusedDay, widget.calendarFormat);
+    final bool formatChanged =
+        oldWidget.calendarFormat != widget.calendarFormat;
+    final int desiredPage = _pageIndexOf(
+      widget.focusedDay,
+      widget.calendarFormat,
+    );
 
     if (formatChanged ||
         oldWidget.firstDay != widget.firstDay ||
@@ -171,11 +182,17 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
         final DateTime base = firstDayOfMonth(widget.firstDay);
         return (day.year - base.year) * 12 + (day.month - base.month);
       case RangeBarCalendarFormat.twoWeeks:
-        final DateTime base = firstDayOfWeek(widget.firstDay, widget.startingDayOfWeek);
+        final DateTime base = firstDayOfWeek(
+          widget.firstDay,
+          widget.startingDayOfWeek,
+        );
         final DateTime aligned = firstDayOfWeek(day, widget.startingDayOfWeek);
         return aligned.difference(base).inDays ~/ 14;
       case RangeBarCalendarFormat.week:
-        final DateTime base = firstDayOfWeek(widget.firstDay, widget.startingDayOfWeek);
+        final DateTime base = firstDayOfWeek(
+          widget.firstDay,
+          widget.startingDayOfWeek,
+        );
         final DateTime aligned = firstDayOfWeek(day, widget.startingDayOfWeek);
         return aligned.difference(base).inDays ~/ 7;
     }
@@ -187,10 +204,16 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
         final DateTime base = firstDayOfMonth(widget.firstDay);
         return DateTime(base.year, base.month + page, 1);
       case RangeBarCalendarFormat.twoWeeks:
-        final DateTime base = firstDayOfWeek(widget.firstDay, widget.startingDayOfWeek);
+        final DateTime base = firstDayOfWeek(
+          widget.firstDay,
+          widget.startingDayOfWeek,
+        );
         return addDays(base, page * 14);
       case RangeBarCalendarFormat.week:
-        final DateTime base = firstDayOfWeek(widget.firstDay, widget.startingDayOfWeek);
+        final DateTime base = firstDayOfWeek(
+          widget.firstDay,
+          widget.startingDayOfWeek,
+        );
         return addDays(base, page * 7);
     }
   }
@@ -202,27 +225,51 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
         final DateTime l = firstDayOfMonth(widget.lastDay);
         return (l.year - f.year) * 12 + (l.month - f.month) + 1;
       case RangeBarCalendarFormat.twoWeeks:
-        final DateTime f = firstDayOfWeek(widget.firstDay, widget.startingDayOfWeek);
-        final DateTime l = firstDayOfWeek(widget.lastDay, widget.startingDayOfWeek);
+        final DateTime f = firstDayOfWeek(
+          widget.firstDay,
+          widget.startingDayOfWeek,
+        );
+        final DateTime l = firstDayOfWeek(
+          widget.lastDay,
+          widget.startingDayOfWeek,
+        );
         return (l.difference(f).inDays ~/ 14) + 1;
       case RangeBarCalendarFormat.week:
-        final DateTime f = firstDayOfWeek(widget.firstDay, widget.startingDayOfWeek);
-        final DateTime l = firstDayOfWeek(widget.lastDay, widget.startingDayOfWeek);
+        final DateTime f = firstDayOfWeek(
+          widget.firstDay,
+          widget.startingDayOfWeek,
+        );
+        final DateTime l = firstDayOfWeek(
+          widget.lastDay,
+          widget.startingDayOfWeek,
+        );
         return (l.difference(f).inDays ~/ 7) + 1;
     }
   }
 
-  List<DateTime> _visibleDaysForFocused(DateTime focused, RangeBarCalendarFormat format) {
+  List<DateTime> _visibleDaysForFocused(
+    DateTime focused,
+    RangeBarCalendarFormat format,
+  ) {
     switch (format) {
       case RangeBarCalendarFormat.month:
         final DateTime monthStart = firstDayOfMonth(focused);
-        final DateTime gridStart = firstDayOfWeek(monthStart, widget.startingDayOfWeek);
+        final DateTime gridStart = firstDayOfWeek(
+          monthStart,
+          widget.startingDayOfWeek,
+        );
         return List<DateTime>.generate(42, (int i) => addDays(gridStart, i));
       case RangeBarCalendarFormat.twoWeeks:
-        final DateTime gridStart = firstDayOfWeek(focused, widget.startingDayOfWeek);
+        final DateTime gridStart = firstDayOfWeek(
+          focused,
+          widget.startingDayOfWeek,
+        );
         return List<DateTime>.generate(14, (int i) => addDays(gridStart, i));
       case RangeBarCalendarFormat.week:
-        final DateTime gridStart = firstDayOfWeek(focused, widget.startingDayOfWeek);
+        final DateTime gridStart = firstDayOfWeek(
+          focused,
+          widget.startingDayOfWeek,
+        );
         return List<DateTime>.generate(7, (int i) => addDays(gridStart, i));
     }
   }
@@ -241,7 +288,10 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
     if (_currentPage >= _pageCount - 1) {
       return;
     }
-    _pageController.nextPage(duration: const Duration(milliseconds: 250), curve: Curves.easeInOut);
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+    );
   }
 
   /// Number of week rows shown per page for the current format.
@@ -266,13 +316,19 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
     final double maxBarArea = bs.maxBarsPerDay * (bs.height + bs.verticalGap);
     return math.max(
       cs.rowMinHeight,
-      cs.dayNumberHeight + maxBarArea + _moreIndicatorReserve + cs.rowBottomPadding,
+      cs.dayNumberHeight +
+          maxBarArea +
+          _moreIndicatorReserve +
+          cs.rowBottomPadding,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final DateTime headerFocused = _focusedDayForPage(_currentPage, widget.calendarFormat);
+    final DateTime headerFocused = _focusedDayForPage(
+      _currentPage,
+      widget.calendarFormat,
+    );
     final double idealRowHeight = _uniformRowHeight();
     final int weekCount = _weekCountPerPage;
     final double idealPageHeight = idealRowHeight * weekCount;
@@ -290,7 +346,8 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
           actions: widget.headerActions,
           onPrevious: _goPrevious,
           onNext: _goNext,
-          onFormatChanged: (RangeBarCalendarFormat f) => widget.onFormatChanged?.call(f),
+          onFormatChanged:
+              (RangeBarCalendarFormat f) => widget.onFormatChanged?.call(f),
         ),
         RangeBarDowRow(
           startingDayOfWeek: widget.startingDayOfWeek,
@@ -310,11 +367,17 @@ class _RangeBarCalendarState<T> extends State<RangeBarCalendar<T>> {
             itemCount: _pageCount,
             onPageChanged: (int page) {
               setState(() => _currentPage = page);
-              final DateTime newFocused = _focusedDayForPage(page, widget.calendarFormat);
+              final DateTime newFocused = _focusedDayForPage(
+                page,
+                widget.calendarFormat,
+              );
               widget.onPageChanged?.call(newFocused);
             },
             itemBuilder: (BuildContext context, int page) {
-              final DateTime pageFocused = _focusedDayForPage(page, widget.calendarFormat);
+              final DateTime pageFocused = _focusedDayForPage(
+                page,
+                widget.calendarFormat,
+              );
               final List<DateTime> days = _visibleDaysForFocused(
                 pageFocused,
                 widget.calendarFormat,

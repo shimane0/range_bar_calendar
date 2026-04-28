@@ -8,7 +8,9 @@ Widget _wrap(Widget child) {
   // RenderFlex overflow が発生するため、SingleChildScrollView で包むことで
   // overflow を防ぎ、レイアウトは intrinsic 高さで成立させる。
   return MaterialApp(
-    home: Scaffold(body: SizedBox(width: 400, child: SingleChildScrollView(child: child))),
+    home: Scaffold(
+      body: SizedBox(width: 400, child: SingleChildScrollView(child: child)),
+    ),
   );
 }
 
@@ -47,37 +49,38 @@ void main() {
     expect(tapped, isNotNull);
   });
 
-  testWidgets('期間バー単発タップ: デフォルトでは onEventOpenRequested は呼ばれず onEventSelected のみ呼ばれる', (
-    WidgetTester tester,
-  ) async {
-    RangeCalendarEvent<String>? selected;
-    RangeCalendarEvent<String>? opened;
-    await tester.pumpWidget(
-      _wrap(
-        RangeBarCalendar<String>(
-          firstDay: DateTime(2025, 1, 1),
-          lastDay: DateTime(2026, 12, 31),
-          focusedDay: DateTime(2025, 11, 15),
-          events: <RangeCalendarEvent<String>>[
-            RangeCalendarEvent<String>(
-              id: 'trip',
-              title: '北海道旅行',
-              start: DateTime(2025, 11, 12),
-              end: DateTime(2025, 11, 16),
-            ),
-          ],
-          onEventSelected: (RangeCalendarEvent<String> e) => selected = e,
-          onEventOpenRequested: (RangeCalendarEvent<String> e) => opened = e,
+  testWidgets(
+    '期間バー単発タップ: デフォルトでは onEventOpenRequested は呼ばれず onEventSelected のみ呼ばれる',
+    (WidgetTester tester) async {
+      RangeCalendarEvent<String>? selected;
+      RangeCalendarEvent<String>? opened;
+      await tester.pumpWidget(
+        _wrap(
+          RangeBarCalendar<String>(
+            firstDay: DateTime(2025, 1, 1),
+            lastDay: DateTime(2026, 12, 31),
+            focusedDay: DateTime(2025, 11, 15),
+            events: <RangeCalendarEvent<String>>[
+              RangeCalendarEvent<String>(
+                id: 'trip',
+                title: '北海道旅行',
+                start: DateTime(2025, 11, 12),
+                end: DateTime(2025, 11, 16),
+              ),
+            ],
+            onEventSelected: (RangeCalendarEvent<String> e) => selected = e,
+            onEventOpenRequested: (RangeCalendarEvent<String> e) => opened = e,
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('北海道旅行'));
-    await tester.pumpAndSettle();
-    expect(selected, isNotNull);
-    expect(selected!.id, 'trip');
-    expect(opened, isNull, reason: '単発タップで詳細遷移してはならない');
-  });
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('北海道旅行'));
+      await tester.pumpAndSettle();
+      expect(selected, isNotNull);
+      expect(selected!.id, 'trip');
+      expect(opened, isNull, reason: '単発タップで詳細遷移してはならない');
+    },
+  );
 
   testWidgets('期間バー長押しで onEventLongPress が呼ばれる', (WidgetTester tester) async {
     RangeCalendarEvent<String>? longPressed;
@@ -106,36 +109,39 @@ void main() {
     expect(longPressed!.id, 'trip');
   });
 
-  testWidgets('eventTapBehavior=openDetails のとき単発タップで onEventOpenRequested が呼ばれる', (
+  testWidgets(
+    'eventTapBehavior=openDetails のとき単発タップで onEventOpenRequested が呼ばれる',
+    (WidgetTester tester) async {
+      RangeCalendarEvent<String>? opened;
+      await tester.pumpWidget(
+        _wrap(
+          RangeBarCalendar<String>(
+            firstDay: DateTime(2025, 1, 1),
+            lastDay: DateTime(2026, 12, 31),
+            focusedDay: DateTime(2025, 11, 15),
+            eventTapBehavior: RangeBarEventTapBehavior.openDetails,
+            events: <RangeCalendarEvent<String>>[
+              RangeCalendarEvent<String>(
+                id: 'trip',
+                title: '北海道旅行',
+                start: DateTime(2025, 11, 12),
+                end: DateTime(2025, 11, 16),
+              ),
+            ],
+            onEventOpenRequested: (RangeCalendarEvent<String> e) => opened = e,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('北海道旅行'));
+      await tester.pumpAndSettle();
+      expect(opened, isNotNull);
+    },
+  );
+
+  testWidgets('eventTapBehavior=none のとき単発タップで何も呼ばれない', (
     WidgetTester tester,
   ) async {
-    RangeCalendarEvent<String>? opened;
-    await tester.pumpWidget(
-      _wrap(
-        RangeBarCalendar<String>(
-          firstDay: DateTime(2025, 1, 1),
-          lastDay: DateTime(2026, 12, 31),
-          focusedDay: DateTime(2025, 11, 15),
-          eventTapBehavior: RangeBarEventTapBehavior.openDetails,
-          events: <RangeCalendarEvent<String>>[
-            RangeCalendarEvent<String>(
-              id: 'trip',
-              title: '北海道旅行',
-              start: DateTime(2025, 11, 12),
-              end: DateTime(2025, 11, 16),
-            ),
-          ],
-          onEventOpenRequested: (RangeCalendarEvent<String> e) => opened = e,
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('北海道旅行'));
-    await tester.pumpAndSettle();
-    expect(opened, isNotNull);
-  });
-
-  testWidgets('eventTapBehavior=none のとき単発タップで何も呼ばれない', (WidgetTester tester) async {
     RangeCalendarEvent<String>? selected;
     RangeCalendarEvent<String>? opened;
     await tester.pumpWidget(
@@ -193,14 +199,20 @@ void main() {
     await tester.pumpAndSettle();
     final segments =
         tester
-            .widgetList<RangeBarSegmentWidget<String>>(find.byType(RangeBarSegmentWidget<String>))
+            .widgetList<RangeBarSegmentWidget<String>>(
+              find.byType(RangeBarSegmentWidget<String>),
+            )
             .toList();
     expect(segments, isNotEmpty);
-    final selectedSegments = segments.where((RangeBarSegmentWidget<String> w) => w.isSelected);
+    final selectedSegments = segments.where(
+      (RangeBarSegmentWidget<String> w) => w.isSelected,
+    );
     expect(selectedSegments, isNotEmpty);
     expect(selectedSegments.every((w) => w.segment.event.id == 'trip'), isTrue);
     expect(
-      segments.where((w) => !w.isSelected).every((w) => w.segment.event.id == 'other'),
+      segments
+          .where((w) => !w.isSelected)
+          .every((w) => w.segment.event.id == 'other'),
       isTrue,
     );
   });
@@ -274,7 +286,9 @@ void main() {
     expect(tappedDay!.month, isNot(returnedFocused!.month));
   });
 
-  testWidgets('singleDayEventBuilder は単日かつ非tentativeのイベントで呼ばれる', (WidgetTester tester) async {
+  testWidgets('singleDayEventBuilder は単日かつ非tentativeのイベントで呼ばれる', (
+    WidgetTester tester,
+  ) async {
     final Set<String> inlineCalled = <String>{};
     await tester.pumpWidget(
       _wrap(
@@ -308,7 +322,10 @@ void main() {
             ),
           ],
           builders: RangeBarCalendarBuilders<String>(
-            singleDayEventBuilder: (BuildContext _, RangeBarSegment<String> seg) {
+            singleDayEventBuilder: (
+              BuildContext _,
+              RangeBarSegment<String> seg,
+            ) {
               inlineCalled.add(seg.event.id);
               return Text('inline:${seg.event.title}');
             },
@@ -319,7 +336,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(inlineCalled, contains('single'));
     expect(inlineCalled.contains('trip'), isFalse, reason: '複数日はバー描画');
-    expect(inlineCalled.contains('month'), isFalse, reason: 'tentative 単日はバー描画');
+    expect(
+      inlineCalled.contains('month'),
+      isFalse,
+      reason: 'tentative 単日はバー描画',
+    );
     expect(find.text('inline:会議'), findsOneWidget);
   });
 }

@@ -13,7 +13,7 @@ import 'range_bar_calendar_builders.dart';
 import 'range_bar_segment_widget.dart';
 
 /// Renders a single page (one or more week rows) of the calendar grid.
-class RangeBarCalendarPage<T> extends StatelessWidget {
+class RangeBarCalendarPage<T> extends StatefulWidget {
   const RangeBarCalendarPage({
     required this.visibleDays,
     required this.focusedDay,
@@ -69,12 +69,58 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
   final void Function(DateTime day, int hiddenCount, List<RangeCalendarEvent<T>> hiddenEvents)?
   onMoreTap;
 
+  @override
+  State<RangeBarCalendarPage<T>> createState() => _RangeBarCalendarPageState<T>();
+}
+
+class _RangeBarCalendarPageState<T> extends State<RangeBarCalendarPage<T>> {
+  /// Cached layout result. Recomputed only when the layout-affecting inputs
+  /// change. Selection-only changes (`selectedDay` / `selectedEventId`) do
+  /// not invalidate this cache, eliminating the dominant rebuild cost when
+  /// the user taps days repeatedly.
+  RangeBarLayoutResult<T>? _cachedResult;
+
+  /// Identity of the [events] list captured when [_cachedResult] was last
+  /// computed. Compared with `identical` so callers that mutate the same
+  /// list in place still see updates as long as they pass a new list
+  /// reference (which is the common Riverpod / immutable pattern).
+  List<RangeCalendarEvent<T>>? _cacheEventsIdentity;
+  List<DateTime>? _cacheVisibleDaysIdentity;
+  int? _cacheStartingDayOfWeek;
+  int? _cacheMaxBarsPerDay;
+
+  bool _layoutInputsUnchanged() {
+    return _cachedResult != null &&
+        identical(_cacheEventsIdentity, widget.events) &&
+        identical(_cacheVisibleDaysIdentity, widget.visibleDays) &&
+        _cacheStartingDayOfWeek == widget.startingDayOfWeek &&
+        _cacheMaxBarsPerDay == widget.barStyle.maxBarsPerDay;
+  }
+
+  RangeBarLayoutResult<T> _layoutResult() {
+    if (_layoutInputsUnchanged()) {
+      return _cachedResult!;
+    }
+    final RangeBarLayoutResult<T> r = RangeBarLayoutEngine.calculate<T>(
+      events: widget.events,
+      visibleDays: widget.visibleDays,
+      startingDayOfWeek: widget.startingDayOfWeek,
+      maxBarsPerDay: widget.barStyle.maxBarsPerDay,
+    );
+    _cachedResult = r;
+    _cacheEventsIdentity = widget.events;
+    _cacheVisibleDaysIdentity = widget.visibleDays;
+    _cacheStartingDayOfWeek = widget.startingDayOfWeek;
+    _cacheMaxBarsPerDay = widget.barStyle.maxBarsPerDay;
+    return r;
+  }
+
   void _handleBarTap(RangeCalendarEvent<T> event) {
-    switch (eventTapBehavior) {
+    switch (widget.eventTapBehavior) {
       case RangeBarEventTapBehavior.selectOnly:
-        onEventSelected?.call(event);
+        widget.onEventSelected?.call(event);
       case RangeBarEventTapBehavior.openDetails:
-        onEventOpenRequested?.call(event);
+        widget.onEventOpenRequested?.call(event);
       case RangeBarEventTapBehavior.none:
         break;
     }
@@ -82,14 +128,9 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final RangeBarLayoutResult<T> result = RangeBarLayoutEngine.calculate<T>(
-      events: events,
-      visibleDays: visibleDays,
-      startingDayOfWeek: startingDayOfWeek,
-      maxBarsPerDay: barStyle.maxBarsPerDay,
-    );
+    final RangeBarLayoutResult<T> result = _layoutResult();
 
-    final int weekCount = visibleDays.length ~/ 7;
+    final int weekCount = widget.visibleDays.length ~/ 7;
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
@@ -111,7 +152,7 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
     double colWidth,
     RangeBarLayoutResult<T> result,
   ) {
-    final List<DateTime> daysInWeek = visibleDays.sublist(weekIndex * 7, weekIndex * 7 + 7);
+    final List<DateTime> daysInWeek = widget.visibleDays.sublist(weekIndex * 7, weekIndex * 7 + 7);
 
     bool weekHasOverflow = false;
     for (final DateTime d in daysInWeek) {
@@ -122,18 +163,18 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
     }
 
     final int laneCount = result.weekLaneCounts[weekIndex];
-    final double barAreaHeight = laneCount * (barStyle.height + barStyle.verticalGap);
+    final double barAreaHeight = laneCount * (widget.barStyle.height + widget.barStyle.verticalGap);
     final double moreAreaHeight = weekHasOverflow ? 16.0 : 0.0;
     // Use the uniform [rowHeight] passed from the parent so every week row
     // in every page has the exact same height. This keeps the page (and
     // therefore the whole calendar) at a stable intrinsic height and
     // avoids leftover blank space below the grid.
 
-    final List<RangeBarSegment<T>> segmentsInWeek =
-        result.segments.where((RangeBarSegment<T> s) => s.weekIndex == weekIndex).toList();
+    // Pre-bucketed by the layout engine so retrieval is O(1) per week.
+    final List<RangeBarSegment<T>> segmentsInWeek = result.segmentsByWeek[weekIndex];
 
     return SizedBox(
-      height: rowHeight,
+      height: widget.rowHeight,
       child: Stack(
         children: <Widget>[
           // Background: 7 day cells in a row.
@@ -146,12 +187,12 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
           // Bars.
           for (final RangeBarSegment<T> seg in segmentsInWeek)
             Positioned(
-              left: seg.startCol * colWidth + barStyle.horizontalInset,
+              left: seg.startCol * colWidth + widget.barStyle.horizontalInset,
               top:
-                  calendarStyle.dayNumberHeight +
-                  seg.lane * (barStyle.height + barStyle.verticalGap),
-              width: seg.columnSpan * colWidth - 2 * barStyle.horizontalInset,
-              height: barStyle.height,
+                  widget.calendarStyle.dayNumberHeight +
+                  seg.lane * (widget.barStyle.height + widget.barStyle.verticalGap),
+              width: seg.columnSpan * colWidth - 2 * widget.barStyle.horizontalInset,
+              height: widget.barStyle.height,
               child: _buildBar(context, seg, daysInWeek, colWidth),
             ),
           // More indicators.
@@ -160,7 +201,7 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
               if ((result.hiddenCounts[daysInWeek[col]] ?? 0) > 0)
                 Positioned(
                   left: col * colWidth,
-                  top: calendarStyle.dayNumberHeight + barAreaHeight,
+                  top: widget.calendarStyle.dayNumberHeight + barAreaHeight,
                   width: colWidth,
                   height: moreAreaHeight,
                   child: _buildMore(
@@ -179,15 +220,17 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final DateTime now = DateTime.now();
     final bool isToday = isSameDay(day, now);
-    final bool isSelected = selectedDay != null && isSameDay(selectedDay!, day);
+    final bool isSelected = widget.selectedDay != null && isSameDay(widget.selectedDay!, day);
     final bool isOutside =
-        format == RangeBarCalendarFormat.month ? day.month != focusedDay.month : false;
-    final bool isDisabled = isBeforeDay(day, firstDay) || isAfterDay(day, lastDay);
+        widget.format == RangeBarCalendarFormat.month
+            ? day.month != widget.focusedDay.month
+            : false;
+    final bool isDisabled = isBeforeDay(day, widget.firstDay) || isAfterDay(day, widget.lastDay);
     final bool isWeekend = day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
 
     final RangeBarDayContext dayCtx = RangeBarDayContext(
       day: day,
-      focusedDay: focusedDay,
+      focusedDay: widget.focusedDay,
       isToday: isToday,
       isSelected: isSelected,
       isOutside: isOutside,
@@ -196,13 +239,13 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
     );
 
     final Widget background =
-        builders.cellBackgroundBuilder != null
-            ? builders.cellBackgroundBuilder!(context, dayCtx)
+        widget.builders.cellBackgroundBuilder != null
+            ? widget.builders.cellBackgroundBuilder!(context, dayCtx)
             : _defaultCellBackground(theme, dayCtx);
 
     final Widget number =
-        builders.dayNumberBuilder != null
-            ? builders.dayNumberBuilder!(context, dayCtx)
+        widget.builders.dayNumberBuilder != null
+            ? widget.builders.dayNumberBuilder!(context, dayCtx)
             : _defaultDayNumber(theme, dayCtx);
 
     return GestureDetector(
@@ -211,17 +254,19 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
       // ただし第二引数の focusedDay は据え置き（タップした日 day は
       // 別月の可能性があるため、月ジャンプを防ぐ）。アプリ側で月遷移
       // させたい場合は onDayTap 内で focusedDay を上書きすればよい。
-      onTap: isDisabled ? null : () => onDayTap?.call(day, isOutside ? focusedDay : day),
+      onTap:
+          isDisabled ? null : () => widget.onDayTap?.call(day, isOutside ? widget.focusedDay : day),
       child: Stack(
         fit: StackFit.expand,
         children: <Widget>[
           background,
           Positioned(
-            top: calendarStyle.dayNumberPadding.top,
-            left: calendarStyle.dayNumberPadding.left,
-            right: calendarStyle.dayNumberPadding.right,
+            top: widget.calendarStyle.dayNumberPadding.top,
+            left: widget.calendarStyle.dayNumberPadding.left,
+            right: widget.calendarStyle.dayNumberPadding.right,
             child: SizedBox(
-              height: calendarStyle.dayNumberHeight - calendarStyle.dayNumberPadding.top,
+              height:
+                  widget.calendarStyle.dayNumberHeight - widget.calendarStyle.dayNumberPadding.top,
               child: number,
             ),
           ),
@@ -232,48 +277,51 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
 
   Widget _defaultCellBackground(ThemeData theme, RangeBarDayContext d) {
     final Color border =
-        calendarStyle.cellBorderColor ?? theme.colorScheme.outlineVariant.withValues(alpha: 0.5);
+        widget.calendarStyle.cellBorderColor ??
+        theme.colorScheme.outlineVariant.withValues(alpha: 0.5);
     final Color? bg =
         d.isSelected
-            ? (calendarStyle.selectedBackgroundColor ??
+            ? (widget.calendarStyle.selectedBackgroundColor ??
                 theme.colorScheme.primaryContainer.withValues(alpha: 0.4))
             : d.isToday
-            ? (calendarStyle.todayBackgroundColor ??
+            ? (widget.calendarStyle.todayBackgroundColor ??
                 theme.colorScheme.secondaryContainer.withValues(alpha: 0.3))
             : null;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: bg,
         border: Border(
-          top: BorderSide(color: border, width: calendarStyle.cellBorderWidth),
-          right: BorderSide(color: border, width: calendarStyle.cellBorderWidth),
+          top: BorderSide(color: border, width: widget.calendarStyle.cellBorderWidth),
+          right: BorderSide(color: border, width: widget.calendarStyle.cellBorderWidth),
         ),
       ),
     );
   }
 
   Widget _defaultDayNumber(ThemeData theme, RangeBarDayContext d) {
-    TextStyle? base = calendarStyle.dayNumberStyle ?? theme.textTheme.bodySmall;
+    TextStyle? base = widget.calendarStyle.dayNumberStyle ?? theme.textTheme.bodySmall;
     if (d.isOutside) {
       base =
-          calendarStyle.outsideDayNumberStyle ??
+          widget.calendarStyle.outsideDayNumberStyle ??
           base?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.35));
     } else if (d.isDisabled) {
       base =
-          calendarStyle.disabledDayNumberStyle ??
+          widget.calendarStyle.disabledDayNumberStyle ??
           base?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.25));
     } else if (d.isToday) {
       base =
-          calendarStyle.todayDayNumberStyle ??
+          widget.calendarStyle.todayDayNumberStyle ??
           base?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold);
     } else if (d.isWeekend) {
       final bool isSunday = d.day.weekday == DateTime.sunday;
-      final Color? perDayColor = isSunday ? calendarStyle.sundayColor : calendarStyle.saturdayColor;
+      final Color? perDayColor =
+          isSunday ? widget.calendarStyle.sundayColor : widget.calendarStyle.saturdayColor;
       if (perDayColor != null) {
-        base = (calendarStyle.weekendDayNumberStyle ?? base)?.copyWith(color: perDayColor);
+        base = (widget.calendarStyle.weekendDayNumberStyle ?? base)?.copyWith(color: perDayColor);
       } else {
         base =
-            calendarStyle.weekendDayNumberStyle ?? base?.copyWith(color: theme.colorScheme.error);
+            widget.calendarStyle.weekendDayNumberStyle ??
+            base?.copyWith(color: theme.colorScheme.error);
       }
     }
     return Align(alignment: Alignment.centerLeft, child: Text('${d.day.day}', style: base));
@@ -285,7 +333,8 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
     List<DateTime> daysInWeek,
     double colWidth,
   ) {
-    final bool isSelected = selectedEventId != null && seg.event.id == selectedEventId;
+    final bool isSelected =
+        widget.selectedEventId != null && seg.event.id == widget.selectedEventId;
 
     // タップ位置から実タップ日を解決するヘルパー。onEventTapAtDay 設定時のみ使う。
     // バーの実描画幅は (columnSpan * colWidth - 2*horizontalInset)。
@@ -294,30 +343,30 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
     // dayIndex = floor((localPosition.dx + horizontalInset) / colWidth) で
     // 安定的に解決できる。
     void Function(Offset)? tapWithPosition;
-    if (onEventTapAtDay != null) {
+    if (widget.onEventTapAtDay != null) {
       tapWithPosition = (Offset localPosition) {
-        final double adjustedDx = localPosition.dx + barStyle.horizontalInset;
+        final double adjustedDx = localPosition.dx + widget.barStyle.horizontalInset;
         final int dayIndex = (adjustedDx / colWidth).floor().clamp(0, seg.columnSpan - 1);
         final int absoluteIndex = (seg.startCol + dayIndex).clamp(0, daysInWeek.length - 1);
         final DateTime tappedDay = daysInWeek[absoluteIndex];
-        onEventTapAtDay!(seg.event, tappedDay);
+        widget.onEventTapAtDay!(seg.event, tappedDay);
       };
     }
 
-    if (builders.rangeBarBuilder != null) {
+    if (widget.builders.rangeBarBuilder != null) {
       return GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: tapWithPosition != null ? null : () => _handleBarTap(seg.event),
         onTapUp:
             tapWithPosition != null ? (TapUpDetails d) => tapWithPosition!(d.localPosition) : null,
-        onLongPress: () => onEventLongPress?.call(seg.event),
-        child: builders.rangeBarBuilder!(context, seg),
+        onLongPress: () => widget.onEventLongPress?.call(seg.event),
+        child: widget.builders.rangeBarBuilder!(context, seg),
       );
     }
     // 単日（start == end）かつ非 tentative の予定は、Google カレンダー
     // 風のインライン表示（● HH:mm タイトル）に差し替え可能。レーン配置・
     // タップ配線・+N 計算は通常のバーと同一（lane を占有する）。
-    if (builders.singleDayEventBuilder != null &&
+    if (widget.builders.singleDayEventBuilder != null &&
         !seg.event.isTentative &&
         isSameDay(seg.event.start, seg.event.end)) {
       return GestureDetector(
@@ -325,17 +374,17 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
         onTap: tapWithPosition != null ? null : () => _handleBarTap(seg.event),
         onTapUp:
             tapWithPosition != null ? (TapUpDetails d) => tapWithPosition!(d.localPosition) : null,
-        onLongPress: () => onEventLongPress?.call(seg.event),
-        child: builders.singleDayEventBuilder!(context, seg),
+        onLongPress: () => widget.onEventLongPress?.call(seg.event),
+        child: widget.builders.singleDayEventBuilder!(context, seg),
       );
     }
     return RangeBarSegmentWidget<T>(
       segment: seg,
-      style: barStyle,
+      style: widget.barStyle,
       isSelected: isSelected,
       onTap: () => _handleBarTap(seg.event),
       onTapWithPosition: tapWithPosition,
-      onLongPress: () => onEventLongPress?.call(seg.event),
+      onLongPress: () => widget.onEventLongPress?.call(seg.event),
     );
   }
 
@@ -345,25 +394,25 @@ class RangeBarCalendarPage<T> extends StatelessWidget {
     int hiddenCount,
     List<RangeCalendarEvent<T>> hiddenEvents,
   ) {
-    if (builders.moreIndicatorBuilder != null) {
+    if (widget.builders.moreIndicatorBuilder != null) {
       return GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTap: () => onMoreTap?.call(day, hiddenCount, hiddenEvents),
-        child: builders.moreIndicatorBuilder!(context, day, hiddenCount, hiddenEvents),
+        onTap: () => widget.onMoreTap?.call(day, hiddenCount, hiddenEvents),
+        child: widget.builders.moreIndicatorBuilder!(context, day, hiddenCount, hiddenEvents),
       );
     }
     final ThemeData theme = Theme.of(context);
     final TextStyle textStyle =
-        calendarStyle.moreIndicatorTextStyle ??
+        widget.calendarStyle.moreIndicatorTextStyle ??
         theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
         ) ??
         const TextStyle(fontSize: 11);
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onTap: () => onMoreTap?.call(day, hiddenCount, hiddenEvents),
+      onTap: () => widget.onMoreTap?.call(day, hiddenCount, hiddenEvents),
       child: Padding(
-        padding: calendarStyle.moreIndicatorPadding,
+        padding: widget.calendarStyle.moreIndicatorPadding,
         child: Align(
           alignment: Alignment.centerLeft,
           child: Text('+$hiddenCount', style: textStyle),

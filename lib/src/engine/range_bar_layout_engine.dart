@@ -32,14 +32,10 @@ class RangeBarLayoutEngine {
     required int maxBarsPerDay,
   }) {
     assert(visibleDays.isNotEmpty, 'visibleDays must not be empty');
-    assert(
-      visibleDays.length % 7 == 0,
-      'visibleDays.length must be a multiple of 7',
-    );
+    assert(visibleDays.length % 7 == 0, 'visibleDays.length must be a multiple of 7');
     assert(maxBarsPerDay >= 1, 'maxBarsPerDay must be >= 1');
     assert(
-      startingDayOfWeek >= DateTime.monday &&
-          startingDayOfWeek <= DateTime.sunday,
+      startingDayOfWeek >= DateTime.monday && startingDayOfWeek <= DateTime.sunday,
       'startingDayOfWeek must be 1..7',
     );
 
@@ -85,13 +81,18 @@ class RangeBarLayoutEngine {
     // Per-week lane occupancy grid: [week][lane][col].
     final List<List<List<bool>>> occupied = List<List<List<bool>>>.generate(
       weekCount,
-      (_) => List<List<bool>>.generate(
-        maxBarsPerDay,
-        (_) => List<bool>.filled(7, false),
-      ),
+      (_) => List<List<bool>>.generate(maxBarsPerDay, (_) => List<bool>.filled(7, false)),
     );
 
     final List<RangeBarSegment<T>> segments = <RangeBarSegment<T>>[];
+    // Pre-bucket segments by their `weekIndex` so the renderer can look up
+    // segments for a given week row in O(1) instead of filtering the flat
+    // [segments] list each time. Important when there are many bars on a
+    // single page.
+    final List<List<RangeBarSegment<T>>> segmentsByWeek = List<List<RangeBarSegment<T>>>.generate(
+      weekCount,
+      (_) => <RangeBarSegment<T>>[],
+    );
     final Map<DateTime, int> hiddenCounts = <DateTime, int>{};
     final Map<DateTime, List<RangeCalendarEvent<T>>> hiddenEventsByDay =
         <DateTime, List<RangeCalendarEvent<T>>>{};
@@ -109,10 +110,8 @@ class RangeBarLayoutEngine {
           continue;
         }
 
-        final DateTime segStart =
-            compareDate(ne.start, weekStart) >= 0 ? ne.start : weekStart;
-        final DateTime segEnd =
-            compareDate(ne.end, weekEnd) <= 0 ? ne.end : weekEnd;
+        final DateTime segStart = compareDate(ne.start, weekStart) >= 0 ? ne.start : weekStart;
+        final DateTime segEnd = compareDate(ne.end, weekEnd) <= 0 ? ne.end : weekEnd;
         final int startCol = columnOfDay(segStart, startingDayOfWeek);
         final int endCol = columnOfDay(segEnd, startingDayOfWeek);
 
@@ -144,9 +143,7 @@ class RangeBarLayoutEngine {
           for (int c = startCol; c <= endCol; c++) {
             final DateTime day = visibleDays[w * 7 + c];
             hiddenCounts[day] = (hiddenCounts[day] ?? 0) + 1;
-            (hiddenEventsByDay[day] ??= <RangeCalendarEvent<T>>[]).add(
-              ne.event,
-            );
+            (hiddenEventsByDay[day] ??= <RangeCalendarEvent<T>>[]).add(ne.event);
           }
           prevLane = null;
           continue;
@@ -161,28 +158,27 @@ class RangeBarLayoutEngine {
 
         final bool startsAtEventStart = compareDate(segStart, ne.start) == 0;
         final bool endsAtEventEnd = compareDate(segEnd, ne.end) == 0;
-        segments.add(
-          RangeBarSegment<T>(
-            event: ne.event,
-            weekIndex: w,
-            startCol: startCol,
-            endCol: endCol,
-            lane: assigned,
-            startsInsideVisibleRange:
-                startsAtEventStart &&
-                compareDate(ne.event.start, visibleStart) >= 0,
-            endsInsideVisibleRange:
-                endsAtEventEnd && compareDate(ne.event.end, visibleEnd) <= 0,
-            startsAtEventStart: startsAtEventStart,
-            endsAtEventEnd: endsAtEventEnd,
-          ),
+        final RangeBarSegment<T> seg = RangeBarSegment<T>(
+          event: ne.event,
+          weekIndex: w,
+          startCol: startCol,
+          endCol: endCol,
+          lane: assigned,
+          startsInsideVisibleRange:
+              startsAtEventStart && compareDate(ne.event.start, visibleStart) >= 0,
+          endsInsideVisibleRange: endsAtEventEnd && compareDate(ne.event.end, visibleEnd) <= 0,
+          startsAtEventStart: startsAtEventStart,
+          endsAtEventEnd: endsAtEventEnd,
         );
+        segments.add(seg);
+        segmentsByWeek[w].add(seg);
         prevLane = assigned;
       }
     }
 
     return RangeBarLayoutResult<T>(
       segments: segments,
+      segmentsByWeek: segmentsByWeek,
       weekLaneCounts: weekLaneCounts,
       hiddenCounts: hiddenCounts,
       hiddenEventsByDay: hiddenEventsByDay,
