@@ -1,0 +1,21 @@
+name: range_bar_calendar
+description: >-
+  A Google Calendar-style Flutter calendar widget that renders multi-day
+  events as horizontal range bars across week rows. Format-switchable
+  (month / two-weeks / week) with a pure-Dart layout engine.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.7.0
+  flutter: '>=3.27.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
